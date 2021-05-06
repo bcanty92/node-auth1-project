@@ -1,63 +1,67 @@
-// Require `checkUsernameFree`, `checkUsernameExists` and `checkPasswordLength`
-// middleware functions from `auth-middleware.js`. You will need them here!
+const model = require('../users/users-model');
 
-
-/**
-  1 [POST] /api/auth/register { "username": "sue", "password": "1234" }
-
-  response:
-  status 200
-  {
-    "user_id": 2,
-    "username": "sue"
+function restricted() {
+  return async(req, res, next) => {
+    try {
+      if (!req.session || !req.session.user) {
+        return res.status(401).json({
+          message: "You shall not pass!"
+        })
+      }
+      next();
+    }
+    catch(err) {
+      next(err);
+    }
   }
+}
 
-  response on username taken:
-  status 422
-  {
-    "message": "Username taken"
+async function checkUsernameFree(req, res, next) {
+  const { username } = req.body
+  const user = await model.findBy({username}).first();
+
+  if (user){
+      res.status(422).json({
+        message:"Username taken"
+      })
   }
-
-  response on password three chars or less:
-  status 422
-  {
-    "message": "Password must be longer than 3 chars"
+  else {
+      next()
   }
- */
+}
 
+async function checkUsernameExists(req, res, next) {
+  const user = await model.findBy(req.body.username)
 
-/**
-  2 [POST] /api/auth/login { "username": "sue", "password": "1234" }
-
-  response:
-  status 200
-  {
-    "message": "Welcome sue!"
+  if (!user){
+      res.status(401).json({
+        message:"Invalid credentials"
+      })
   }
-
-  response on invalid credentials:
-  status 401
-  {
-    "message": "Invalid credentials"
+  else {
+      req.user = user;
+      next()
   }
- */
+}
 
+function checkPasswordLength() {
+  return (req, res, next) => {
+    const password = req.body.password;
 
-/**
-  3 [GET] /api/auth/logout
-
-  response for logged-in users:
-  status 200
-  {
-    "message": "logged out"
+    if (!password || password.length < 4) {
+      return res.status(422).json({
+        message: "Password must be longer than 3 chars"
+      })
+    }
+    else {
+      next();
+    }
   }
+}
 
-  response for not-logged-in users:
-  status 200
-  {
-    "message": "no session"
-  }
- */
-
- 
-// Don't forget to add the router to the `exports` object so it can be required in other modules
+module.exports = {
+  restricted,
+  checkUsernameFree,
+  checkUsernameExists,
+  checkPasswordLength,
+}
